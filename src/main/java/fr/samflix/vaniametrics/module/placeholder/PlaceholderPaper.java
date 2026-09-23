@@ -6,31 +6,32 @@ import fr.samflix.vaniametrics.api.VaniaMetrics;
 import fr.samflix.vaniametrics.api.VaniaMetricsProvider;
 
 /**
- * Le connecteur de dernier recours : n'importe quel placeholder en métrique.
+ * The last-resort connector: any placeholder as a metric.
  *
- * <p>Liste blanche vide par défaut, valeurs numériques seulement, résolution sans joueur. Trois gardes, aucun facultatif.
+ * <p>Empty whitelist by default, numeric values only, resolved with no player. Three guards,
+ * none optional.
  */
 public final class PlaceholderPaper extends JavaPlugin {
 
-	private PlaceholderCollector collecteur;
+	private PlaceholderCollector collector;
 
 	@Override
 	public void onEnable() {
-		VaniaMetrics metriques = VaniaMetricsProvider.get();
-		collecteur = new PlaceholderCollector(metriques.plateforme(), metriques.config());
-		if (!collecteur.aQuelqueChoseAFaire()) {
-			// Rien de demandé : on n'enregistre même pas le collecteur. Un
-			// instrument déclaré et jamais alimenté se lirait comme un zéro.
-			getLogger().info("aucun placeholder demandé — module inactif.");
+		VaniaMetrics metrics = VaniaMetricsProvider.get();
+		collector = new PlaceholderCollector(metrics.platform(), metrics.config());
+		if (!collector.hasSomethingToDo()) {
+			// Nothing requested: don't even register the collector. An instrument declared
+			// and never fed would read like a zero.
+			getLogger().info("no placeholder requested — module inactive.");
 			return;
 		}
-		metriques.enregistrer(collecteur);
+		metrics.register(collector);
 	}
 
 	@Override
 	public void onDisable() {
-		if (collecteur != null) {
-			VaniaMetricsProvider.chercher().ifPresent(m -> m.retirer(collecteur));
+		if (collector != null) {
+			VaniaMetricsProvider.find().ifPresent(m -> m.unregister(collector));
 		}
 	}
 }

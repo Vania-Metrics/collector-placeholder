@@ -15,124 +15,124 @@ import fr.samflix.vaniametrics.api.MetricRegistry;
 import fr.samflix.vaniametrics.api.Platform;
 
 /**
- * PlaceholderAPI — LE CONNECTEUR DE DERNIER RECOURS.
+ * PlaceholderAPI — the last-resort connector.
  *
- * <p>Neuf plugins s'y branchent sur ce serveur. Celui-ci expose n'importe lequel de leurs
- * placeholders comme métrique, ce qui couvre d'un coup tous les plugins qui n'auront jamais de
- * module à eux. C'est aussi le seul connecteur qui ne mesure rien par lui-même : il relaie.
+ * <p>Nine plugins hook into it on this server. This one exposes any of their placeholders as a
+ * metric, which covers in one go every plugin that will never have a module of its own. It's
+ * also the only connector that doesn't measure anything itself: it relays.
  *
- * <p>D'OÙ TROIS GARDES, ET AUCUN N'EST FACULTATIF.
+ * <p>Hence three guards, none of them optional.
  *
  * <ol>
- *   <li><b>Une liste blanche, et vide par défaut.</b> Ce module ne fait rien tant que personne
- *       n'a écrit ce qu'il veut. Exposer « tous les placeholders » n'a pas de sens : il y en a des
- *       centaines, la plupart rendent du texte.
- *   <li><b>Seul ce qui est NUMÉRIQUE est publié</b>, et ce qui ne l'est pas est signalé UNE FOIS
- *       puis ignoré. Un placeholder rend une chaîne ; parier qu'elle se convertit, c'est publier
- *       {@code NaN} en silence pour un nom mal orthographié.
- *   <li><b>Résolu SANS joueur.</b> {@code setPlaceholders(null, …)} rend la valeur globale. Les
- *       placeholders par joueur rouvriraient la porte à la cardinalité, et pour ceux-là il existe
- *       un module dédié — c'est tout l'objet de cette architecture.
+ *   <li><b>A whitelist, empty by default.</b> This module does nothing until someone has written
+ *       what they want. Exposing "every placeholder" makes no sense: there are hundreds, most of
+ *       which render text.
+ *   <li><b>Only what is numeric gets published</b>, and what isn't is reported once then
+ *       ignored. A placeholder renders a string; betting that it converts means silently
+ *       publishing {@code NaN} for a misspelled name.
+ *   <li><b>Resolved with no player.</b> {@code setPlaceholders(null, …)} yields the global value.
+ *       Per-player placeholders would reopen the door to cardinality, and for those a dedicated
+ *       module exists — that's the whole point of this architecture.
  * </ol>
  *
- * <p>Le nom de la métrique est déduit du placeholder : {@code %plan_players_online_total%} devient
- * {@code mc_placeholder_plan_players_online_total}. Le domaine {@code placeholder} dit d'où vient
- * la valeur, ce qui est exactement ce qu'on veut savoir d'un chiffre relayé.
+ * <p>The metric name is derived from the placeholder: {@code %plan_players_online_total%}
+ * becomes {@code mc_placeholder_plan_players_online_total}. The {@code placeholder} domain says
+ * where the value comes from, which is exactly what you want to know about a relayed number.
  */
 public final class PlaceholderCollector implements Collector {
 
-	private final Platform plateforme;
-	private final List<String> demandes;
-	private final List<String> refuses = new ArrayList<>();
+	private final Platform platform;
+	private final List<String> requested;
+	private final List<String> rejected = new ArrayList<>();
 
-	private Gauge valeurs;
+	private Gauge values;
 
-	public PlaceholderCollector(Platform plateforme, Config config) {
-		this.plateforme = plateforme;
-		String liste = config.texte("collector.placeholder.list", "");
-		this.demandes = liste.isBlank()
+	public PlaceholderCollector(Platform platform, Config config) {
+		this.platform = platform;
+		String list = config.getString("collector.placeholder.list", "");
+		this.requested = list.isBlank()
 				? List.of()
-				: List.of(liste.split("\\s*,\\s*"));
+				: List.of(list.split("\\s*,\\s*"));
 	}
 
 	@Override
-	public String nom() {
+	public String name() {
 		return "placeholder";
 	}
 
 	@Override
-	public String origine() {
+	public String source() {
 		return "PlaceholderAPI";
 	}
 
 	@Override
-	public boolean enFond() {
+	public boolean isBackground() {
 		return true;
 	}
 
 	@Override
-	public long intervalleSecondes() {
+	public long intervalSeconds() {
 		return 30;
 	}
 
 	@Override
-	public boolean filPrincipal() {
-		// Un placeholder peut interroger n'importe quoi — un monde, un inventaire, une carte du
-		// serveur. On le résout donc là où ces choses se lisent.
+	public boolean needsMainThread() {
+		// A placeholder can query anything — a world, an inventory, the server map. So it's
+		// resolved wherever those things are read.
 		return true;
 	}
 
 	@Override
-	public void declarer(MetricRegistry r) {
-		valeurs = r.gauge("placeholder_value",
-				"Valeur d'un placeholder, relayée telle quelle. Seul ce qui se convertit en "
-						+ "nombre est publié — le reste est signalé une fois puis ignoré.",
+	public void declare(MetricRegistry r) {
+		values = r.gauge("placeholder_value",
+				"Value of a placeholder, relayed as-is. Only what converts to a number is "
+						+ "published — the rest is reported once then ignored.",
 				"placeholder");
-		if (demandes.isEmpty()) {
-			plateforme.info("collecteur placeholder — aucune demande dans "
-					+ "collector.placeholder.list, rien ne sera publié");
+		if (requested.isEmpty()) {
+			platform.info("placeholder collector — nothing in "
+					+ "collector.placeholder.list, nothing will be published");
 		} else {
-			plateforme.info("collecteur placeholder — " + demandes.size() + " demandé(s)");
+			platform.info("placeholder collector — " + requested.size() + " requested");
 		}
 	}
 
 	@Override
-	public void relever(MetricRegistry r) {
-		for (String brut : demandes) {
-			String motif = brut.startsWith("%") ? brut : "%" + brut + "%";
-			if (refuses.contains(motif)) {
+	public void collect(MetricRegistry r) {
+		for (String raw : requested) {
+			String pattern = raw.startsWith("%") ? raw : "%" + raw + "%";
+			if (rejected.contains(pattern)) {
 				continue;
 			}
-			// null et pas un joueur : on veut la valeur GLOBALE. Un placeholder par joueur
-			// ferait une série par joueur, ce que cette architecture évite exprès.
-			String rendu = PlaceholderAPI.setPlaceholders(null, motif);
-			if (rendu == null || rendu.equals(motif)) {
-				// Inchangé = aucune extension ne l'a reconnu. Se taire ici laisserait croire à
-				// une valeur nulle alors que le nom est faux.
-				refuser(motif, "aucune extension ne le reconnaît");
+			// null and no player: we want the GLOBAL value. A per-player placeholder would
+			// create a per-player series, which this architecture is built to avoid.
+			String rendered = PlaceholderAPI.setPlaceholders(null, pattern);
+			if (rendered == null || rendered.equals(pattern)) {
+				// Unchanged means no extension recognized it. Staying silent here would suggest
+				// a null value when the name is actually wrong.
+				reject(pattern, "no extension recognizes it");
 				continue;
 			}
 			try {
-				valeurs.set(Double.parseDouble(rendu.trim().replace(',', '.')), nomCourt(motif));
+				values.set(Double.parseDouble(rendered.trim().replace(',', '.')), shortName(pattern));
 			} catch (NumberFormatException e) {
-				refuser(motif, "rend « " + rendu + " », qui n'est pas un nombre");
+				reject(pattern, "renders \"" + rendered + "\", which is not a number");
 			}
 		}
 	}
 
-	/** Signalé UNE fois, puis oublié : un avertissement toutes les trente secondes est du bruit. */
-	private void refuser(String motif, String raison) {
-		refuses.add(motif);
-		plateforme.avertir("placeholder " + motif + " — " + raison + ", ignoré désormais");
+	/** Reported ONCE, then forgotten: a warning every thirty seconds is noise. */
+	private void reject(String pattern, String reason) {
+		rejected.add(pattern);
+		platform.warn("placeholder " + pattern + " — " + reason + ", ignored from now on");
 	}
 
-	/** {@code %plan_players_online%} devient {@code plan_players_online}. */
-	private static String nomCourt(String motif) {
-		return motif.replace("%", "").toLowerCase(Locale.ROOT);
+	/** {@code %plan_players_online%} becomes {@code plan_players_online}. */
+	private static String shortName(String pattern) {
+		return pattern.replace("%", "").toLowerCase(Locale.ROOT);
 	}
 
-	/** Pour que le module ne s'enregistre pas s'il n'a rien à faire. */
-	public boolean aQuelqueChoseAFaire() {
-		return !demandes.isEmpty() && Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI");
+	/** So the module doesn't register itself if it has nothing to do. */
+	public boolean hasSomethingToDo() {
+		return !requested.isEmpty() && Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI");
 	}
 }
