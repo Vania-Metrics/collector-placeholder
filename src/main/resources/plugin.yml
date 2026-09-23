@@ -8,3 +8,4 @@ api-version: '1.21'
 authors: [mc-vania]
 description: "PlaceholderAPI metrics: relayed values, whitelisted."
 depend: [VaniaMetrics, PlaceholderAPI]
+folia-supported: true

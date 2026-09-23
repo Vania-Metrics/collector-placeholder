@@ -35,6 +35,10 @@ import fr.samflix.vaniametrics.api.Platform;
  *       module exists — that's the whole point of this architecture.
  * </ol>
  *
+ * <p>On Folia the collection runs on the global region: placeholders that read global state work,
+ * those that read a world, a chunk or an entity are refused by Folia and rejected once, like a
+ * misspelt name.
+ *
  * <p>Every placeholder is one series of a single metric, labelled by its name:
  * {@code %plan_players_online_total%} becomes
  * {@code mc_placeholder_value{placeholder="plan_players_online_total"}}. The {@code placeholder}
@@ -107,7 +111,15 @@ public final class PlaceholderCollector implements Collector {
 			}
 			// null and no player: we want the GLOBAL value. A per-player placeholder would
 			// create a per-player series, which this architecture is built to avoid.
-			String rendered = PlaceholderAPI.setPlaceholders(null, pattern);
+			String rendered;
+			try {
+				rendered = PlaceholderAPI.setPlaceholders(null, pattern);
+			} catch (RuntimeException e) {
+				// On Folia this runs on the global region, where an expansion that reads a world
+				// or an entity is refused. One such placeholder must not take the others down.
+				reject(pattern, "threw " + e);
+				continue;
+			}
 			if (rendered == null || rendered.equals(pattern)) {
 				// Unchanged means no extension recognized it. Staying silent here would suggest
 				// a null value when the name is actually wrong.
