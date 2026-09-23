@@ -1,0 +1,10 @@
+# Le connecteur de dernier recours : n'importe quel placeholder en métrique.
+#
+# Liste blanche vide par défaut, valeurs numériques seulement, résolution sans joueur. Trois gardes, aucun facultatif.
+name: VaniaMetrics-Placeholder
+version: ${version}
+main: fr.samflix.vaniametrics.module.placeholder.PlaceholderPaper
+api-version: '1.21'
+authors: [mc-vania]
+description: "Métriques PlaceholderAPI : valeurs relayées, sur liste blanche."
+depend: [VaniaMetrics, PlaceholderAPI]
