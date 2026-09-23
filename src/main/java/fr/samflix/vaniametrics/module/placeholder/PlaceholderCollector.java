@@ -35,9 +35,11 @@ import fr.samflix.vaniametrics.api.Platform;
  *       module exists — that's the whole point of this architecture.
  * </ol>
  *
- * <p>The metric name is derived from the placeholder: {@code %plan_players_online_total%}
- * becomes {@code mc_placeholder_plan_players_online_total}. The {@code placeholder} domain says
- * where the value comes from, which is exactly what you want to know about a relayed number.
+ * <p>Every placeholder is one series of a single metric, labelled by its name:
+ * {@code %plan_players_online_total%} becomes
+ * {@code mc_placeholder_value{placeholder="plan_players_online_total"}}. The {@code placeholder}
+ * domain says where the value comes from, which is exactly what you want to know about a relayed
+ * number.
  */
 public final class PlaceholderCollector implements Collector {
 
