@@ -1,0 +1,14 @@
+# What the test server needs besides the core; read by the core's testkit (CollectorTestConfig).
+# The first jar of a list is the target plugin: its version is checked against compatibility.yml.
+# The collector only registers with a non-empty list. No expansion is installed, so the one
+# placeholder asked for is reported once as unknown: that warning is expected here.
+collectors: [placeholder]
+runtime: java21
+env:
+  VANIA_METRICS_COLLECTOR_PLACEHOLDER_LIST: "server_online"
+plugins:
+  bukkit:
+    - url: https://cdn.modrinth.com/data/lKEzGugV/versions/pIvQcXW8/PlaceholderAPI-2.12.3.jar
+      sha512: f048d55b633fd816c08e2e4472bd54a75fc4d13534682e6e7745408253d2f393706efdc389d12ca2cf28d4dc035a9afdda3eed9ecde51c7e332831391d9b6479
+allow-logs:
+  - "placeholder %server_online% — no extension recognizes it"
