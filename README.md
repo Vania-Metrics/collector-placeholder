@@ -1,3 +1,5 @@
+<img src="icon.png" alt="" width="96" align="right">
+
 # collector-placeholder
 
 VaniaMetrics collector for placeholder. One module = one jar, loaded by the platform if and only if the core is present.
